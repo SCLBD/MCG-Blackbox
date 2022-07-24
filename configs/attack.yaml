@@ -1,0 +1,8 @@
+
+attacks:
+  class_name: attacks.square.SquareAttack
+  dataset_name: cifar10
+  max_query: 10000
+  targeted: False
+  class_num: 10
+  linf: 0.0313
