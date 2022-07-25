@@ -6,7 +6,7 @@ import attacks
 import data.datasets as datasets
 from utils.attack_count import AttackCountingFunction
 from utils.load_models import load_generator, load_imagenet_model, load_cifar_model
-from utils.buffer import AttackBuffer, AttackListBuffer
+from utils.buffer import ImageBuffer, AttackListBuffer
 from utils.surrogate_trainer import TrainModelSurrogate
 
 
@@ -71,8 +71,8 @@ def attacker_init(args):
         attacker = attacks.SquareAttack(dataset_name=dataset, max_query=max_query, targeted=targeted, class_num=class_num, linf=linf)
     elif args.attack_method == 'signhunter':
         attacker = attacks.SignHunter(dataset_name=dataset, max_query=max_query, targeted=targeted, class_num=class_num, linf=linf)
-    # elif args.attack_method == 'cg':
-    #     # attacker = attacks.C(dataset_name=args.dataset_name, max_query=max_query, targeted=args.targeted, class_num=class_num, popsize=20, if_latent=True, linf_limit=linf)
+    elif args.attack_method == 'cgattack':
+        attacker = attacks.CGAttack(dataset_name=args.dataset_name, max_query=max_query, targeted=args.targeted, class_num=class_num, linf=linf, popsize=20)
     else:
         raise NotImplementedError
     return attacker
@@ -83,9 +83,11 @@ def buffer_init(args):
     attack_method = args.attack_method
     buffer_limit = args.buffer_limit
 
-    image_buffer = AttackBuffer(batch_size=mini_batch_size)
-    clean_buffer = AttackBuffer(batch_size=mini_batch_size)
+    image_buffer = ImageBuffer(batch_size=mini_batch_size)
+    clean_buffer = ImageBuffer(batch_size=mini_batch_size)
     adv_buffer = AttackListBuffer(attack_method=attack_method, batch_size=mini_batch_size, uplimit=buffer_limit)
+    if not args.finetune_perturbation:
+        adv_buffer = None
     return image_buffer, clean_buffer, adv_buffer
 
 

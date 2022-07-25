@@ -47,19 +47,16 @@ class SquareAttack(BaseAttack):
         self.p_init = p_init
         self.n_features = self.c * self.h * self.w
 
-    def attack(self, loss, x, y, init=None, buffer=None, **kwargs):
+    def attack(self, loss_func, x, y, init=None, buffer=None, **kwargs):
         if init is None:
             # [c, 1, w], i.e. vertical stripes designed in Square
             init = np.random.choice([-self.linf, self.linf], size=[x.shape[0], 3, 1, x.shape[-1]])
 
         x_best = torch.clamp(x + init, 0., 1.)
-        output = loss(x_best, y, self.targeted)
+        output = loss_func(x_best, y, self.targeted)
         margin_min, logits_best, loss_min = output['margin'], output['logits'], output['loss']
         query_cnt = 0
         success = False
-
-        if buffer is not None:
-            buffer.new()
 
         for i_iter in range(self.max_query - 1):
             perturbation = x_best - x
@@ -77,7 +74,7 @@ class SquareAttack(BaseAttack):
                     np.random.choice([-self.linf, self.linf], size=[self.c, 1, 1])).cuda()
 
             x_new = torch.clamp(x + perturbation, 0., 1.)
-            output = loss(x_new, y, self.targeted)
+            output = loss_func(x_new, y, self.targeted)
             margin, logits, loss = output['margin'], output['logits'], output['loss']
 
             if buffer is not None and query_cnt < buffer.uplimit:

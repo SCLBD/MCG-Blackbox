@@ -3,11 +3,10 @@ import ast
 import sys
 import torch
 
-# from utils.finetune_operation import finetune_latent, finetune_glow, meta_finetune_glow, finetune_glow_with_coefficient, \
-#     adv_loss
-from models.flow_latent import latent_operate, latent_initialize, generate_interface
-from attacks.base_attack import margin_loss_interface
 import utils.attack_init as attack_init
+from attacks.base_attack import margin_loss_interface
+from models.flow_latent import latent_operate, latent_initialize, generate_interface
+from utils.finetune import finetune_latent, meta_finetune
 
 
 def attack():
@@ -20,6 +19,7 @@ def attack():
     log_path = attack_init.log_init(args)
     loss_function = margin_loss_interface(T, class_num=args.class_num)
     generate_function = generate_interface(G, latent_operate, args.linf)
+    mini_batch_size = args.finetune_mini_batch_size
 
     for i, (images, labels) in enumerate(dataloader):
         with torch.no_grad():
@@ -57,31 +57,34 @@ def attack():
             labels = args.target_label
 
         if args.finetune_perturbation:
-            clean_batch_images, clean_batch_logits, clean_batch_labels = image_buffer.sample_batch(args.mini_batch_size)
+            # Make the fine-tuning robust with clean images
+            clean_batch_images, clean_batch_logits, clean_batch_labels = image_buffer.sample_batch(mini_batch_size - 1)
 
             clean_batch_images = torch.cat([clean_batch_images, images], dim=0)
             clean_batch_logits = torch.cat([clean_batch_logits, clean_logits.unsqueeze(0)], dim=0)
             clean_batch_labels = torch.cat([clean_batch_labels, labels_tensor], dim=0)
 
             for idx in range(len(surrogates)):
-                trainer.forward_loss(surrogates[idx], surrogate_optims[idx],
-                                     clean_batch_images, clean_batch_logits, clean_batch_labels)
-            if adv_buffer.length() >= mini_batch_size:
+                trainer.forward_loss(
+                    surrogates[idx], surrogate_optims[idx], clean_batch_images, clean_batch_logits, clean_batch_labels)
+
+            if adv_buffer.length() > mini_batch_size:
+                # Batch: images, logits, labels
                 current_batch = (images, clean_logits.unsqueeze(0), labels)
-                for _ in range(adv_buffer.uplimit):
-                    # perturbation_batch_images, perturbation_batch_logits, perturbation_batch_labels = attack_list_buffer.sample_batch(mini_batch_size)
-                    perturbation_batch = adv_buffer.sample_batch(mini_batch_size)
-                    for idx in range(len(surrogates)):
-                        trainer.lifelong_forward_loss(surrogates[idx], surrogate_optims[idx],
-                                                    perturbation_batch, current_batch)
+                perturbation_batch = adv_buffer.sample_batch(mini_batch_size)
+                for idx in range(len(surrogates)):
+                    trainer.lifelong_forward_loss(
+                        surrogates[idx], surrogate_optims[idx], perturbation_batch, current_batch)
+
+        if args.finetune_perturbation:
+            adv_buffer.add_clean(images, clean_logits, labels)
+
+        latent, __latent_vec = latent_initialize(images, G, latent_operate)
+        if args.finetune_latent:
+            latent, __latent_vec = finetune_latent(G, surrogates, images, labels, latent, args)
 
         if args.finetune_glow:
-            meta_finetune_glow(G, surrogates, images, labels, args, linf=linf)
-
-        if args.finetune_latent:
-            latent, __latent_vec = finetune_latent(G, surrogates, images, labels, args, iteration=30, lr=0.01, linf=linf)
-        else:
-            latent, __latent_vec = latent_initialize(images, G, latent_operate)
+            meta_finetune(G, surrogates, images, labels, latent, args, meta_iteration=3)
 
         # First attack attempt
         perturbation = generate_function(images, latent)
@@ -90,20 +93,24 @@ def attack():
         query_cnt += 1
         if loss_output['margin'] <= 0:
             success = True
+        print(loss_output['margin'], loss_output['loss'])
 
         if not args.test_fasr and not success:
             if args.attack_method in ['cgattack']:
-                loss_function = ...
-                attack_output = attacker.attack(compound, latent, adv_buffer)
+                generator_loss_function = attacker.generator_loss_interface(generate_function, loss_function, args.targeted)
+                attack_output = attacker.attack(generator_loss_function, images, labels, init=None, buffer=adv_buffer, latent=latent)
             else:
                 attack_output = attacker.attack(loss_function, images, labels, init=perturbation, buffer=adv_buffer)
             query_cnt += attack_output['query_cnt']
+            success = attack_output['success']
 
-        if args.finetune_perturbation:
-            adv_buffer.add_clean(images, clean_logits, labels)
+            if args.finetune_perturbation:
+                adv = attack_output['adv']
+                logits = attack_output['logits_best']
+                adv_buffer.add(adv, logits)
 
         F.add(query_cnt, success)
-        log = f'image: {_i} query_cnt: {query_cnt} success: {success} Mean: {F.get_average(args.max_query)} Median: {F.get_median(args.max_query)} FASR: {F.get_first_success()} ASR: {F.get_success_rate()}\n'
+        log = f'image: {_i} query_cnt: {query_cnt} success: {success} Mean: {F.get_average()} Median: {F.get_median()} FASR: {F.get_first_success()} ASR: {F.get_success_rate()}\n'
         if not args.mute:
             print(log)
             sys.stdout.flush()
@@ -115,8 +122,8 @@ def attack():
                 f'Target model: {args.target_model_name} Surrogate models: {args.surrogate_model_names}\n' \
                 f'ASR: {F.get_success_rate()}\n' \
                 f'FASR: {F.get_first_success()}\n' \
-                f'MEAN: {F.get_average(args.max_query)}\n' \
-                f'MEDIAN: {F.get_median(args.max_query)}\n'
+                f'MEAN: {F.get_average()}\n' \
+                f'MEDIAN: {F.get_median()}\n'
     args_log = ''
     for arg in vars(args):
         args_log += f'{arg}: {getattr(args, arg)}\n'

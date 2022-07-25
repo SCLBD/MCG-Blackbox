@@ -7,12 +7,13 @@ from advertorch.utils import NormalizeByChannelMeanStd
 from models.cglow import CondGlowModel
 from io import BytesIO
 from PIL import Image
+
 try:
-    from utils.cifar_models.resnet import ResNet18, ResNet34
-    from utils.cifar_models.vgg import VGG
-    from utils.cifar_models.pyramidnet import pyramid_net110
-    from utils.cifar_models.densenet import DenseNet121
-    from utils.cifar_models.preact_resnet import PreActResNet18
+    from surro_models.cifar10_models.resnet import ResNet18, ResNet34
+    from surro_models.cifar10_models.vgg import VGG
+    from surro_models.cifar10_models.pyramidnet import pyramid_net110
+    from surro_models.cifar10_models.densenet import DenseNet121
+    from surro_models.cifar10_models.preact_resnet import PreActResNet18
 except Exception:
     pass
 
@@ -110,84 +111,62 @@ def load_imagenet_model(model_name, require_optim=False, defence_method=None):
 
 def load_cifar_model(model_name, home_path='checkpoints/cifar10_target_models/', require_optim=False, defence_method=None):
     print('Load cifar model: ', model_name)
-    if model_name == 'Resnet18':
-        net = ResNet18()
+    if model_name == 'resnet18':
+        pretrained_model = ResNet18()
         model_checkpoint_path = os.path.join(home_path, 'ResNet18_ckpt.t7')
-    elif model_name == 'Resnet34':
-        net = ResNet34()
-        model_checkpoint_path = os.path.join(home_path, 'ResNet34_ckpt.t7')
-    elif model_name == 'VGG13':
-        net = VGG('VGG13')
+    elif model_name == 'vgg13':
+        pretrained_model = VGG('VGG13')
         model_checkpoint_path = os.path.join(home_path, 'VGG13_ckpt.t7')
-    elif model_name == 'VGG19':
-        net = VGG('VGG19')
+    elif model_name == 'vgg19':
+        pretrained_model = VGG('VGG19')
         model_checkpoint_path = os.path.join(home_path, 'VGG19_ckpt.t7')
-    elif model_name == 'Pyramidnet':
-        net = pyramid_net110()
+    elif model_name == 'pyramidnet':
+        pretrained_model = pyramid_net110()
         model_checkpoint_path = os.path.join(home_path, 'PyramidNet_ckpt.t7')
-    elif model_name == 'Densenet':
-        net = DenseNet121()
+    elif model_name == 'densenet':
+        pretrained_model = DenseNet121()
         model_checkpoint_path = os.path.join(home_path, 'DenseNet_ckpt.t7')
-    elif model_name == 'PreactResnet':
-        net = PreActResNet18()
+    elif model_name == 'preactresnet':
+        pretrained_model = PreActResNet18()
         model_checkpoint_path = os.path.join(home_path, 'PreActResNet_ckpt.t7')
-    elif model_name == 'Resnet18_top5':
-        net = ResNet18()
-        model_checkpoint_path = os.path.join(home_path, 'cifar10_Resnet18_top_5_ckpt.t7')
-    elif model_name == 'VGG13_top5':
-        net = VGG('VGG13')
-        model_checkpoint_path = os.path.join(home_path, 'cifar10_VGG13_top_5_ckpt.t7')
-    elif model_name == 'PreactResnet_last5':
-        net = PreActResNet18()
-        model_checkpoint_path = os.path.join(home_path, 'cifar10_PreactResnet18_last_5_ckpt.t7')
-    elif model_name == 'Densenet_last5':
-        net = DenseNet121()
-        model_checkpoint_path = os.path.join(home_path, 'cifar10_Densenet121_last_5_ckpt.t7')
-    elif model_name == 'VGG19_last5':
-        net = VGG('VGG19')
-        model_checkpoint_path = os.path.join(home_path, 'cifar10_VGG19_last_5_ckpt.t7')
-    elif model_name == 'Pyramidnet_last5':
-        net = pyramid_net110()
-        model_checkpoint_path = os.path.join(home_path, 'cifar10_Pyramidnet110_last_5_ckpt.t7')
-    elif model_name == 'norm_PreactResnet':
-        net = PreActResNet18()
+    elif model_name == 'norm_preactResnet':
+        pretrained_model = PreActResNet18()
         model_checkpoint_path = os.path.join(home_path, 'cifar10_PreactResnet18_normed_ckpt.t7')
-    elif model_name == 'norm_Densenet':
-        net = DenseNet121()
+    elif model_name == 'norm_densenet':
+        pretrained_model = DenseNet121()
         model_checkpoint_path = os.path.join(home_path, 'cifar10_Densenet121_normed_ckpt.t7')
-    elif model_name == 'norm_VGG19':
-        net = VGG('VGG19')
+    elif model_name == 'norm_vgg19':
+        pretrained_model = VGG('VGG19')
         model_checkpoint_path = os.path.join(home_path, 'cifar10_VGG19_normed_ckpt.t7')
-    elif model_name == 'norm_Pyramidnet':
-        net = pyramid_net110()
+    elif model_name == 'norm_pyramidnet':
+        pretrained_model = pyramid_net110()
         model_checkpoint_path = os.path.join(home_path, 'cifar10_Pyramidnet110_normed_ckpt.t7')
-    elif model_name == 'norm_Resnet18':
-        net = ResNet18()
+    elif model_name == 'norm_resnet18':
+        pretrained_model = ResNet18()
         model_checkpoint_path = os.path.join(home_path, 'cifar10_Resnet18_normed_ckpt.t7')
-    elif model_name == 'PreactResnet_fastadv':
-        net = PreActResNet18()
-        model_checkpoint_path = os.path.join(home_path, 'cifar10_PreactResnet_fastadv.pth.tar')
     else:
-        assert False
+        raise NotImplementedError
     checkpoint = torch.load(model_checkpoint_path)
     try:
-        net.load_state_dict(checkpoint['net'])
-    except:
-        net.load_state_dict(checkpoint)
+        pretrained_model.load_state_dict(checkpoint['net'])
+    except Exception:
+        pretrained_model.load_state_dict(checkpoint)
 
     if model_name.startswith('norm'):
         mean, std = [0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010]
         normalize = NormalizeByChannelMeanStd(mean=mean, std=std)
-        net = torch.nn.Sequential(
+        model = torch.nn.Sequential(
             normalize,
-            net
+            pretrained_model
         )
-    net = net.cuda()
-    net.eval()
+    else:
+        model = pretrained_model
+    model = model.cuda()
+    model.eval()
     if require_optim:
-        optim = torch.optim.SGD(net.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-6, nesterov=True)
-        return net, optim
-    return net
+        optimizer = torch.optim.Adam(pretrained_model.parameters(), lr=3e-4)
+        return model, optimizer
+    return model
 
 
 class JpegCompression(torch.nn.Module):

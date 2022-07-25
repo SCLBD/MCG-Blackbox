@@ -8,7 +8,7 @@ def margin_loss_interface(model, class_num):
         with torch.no_grad():
             logits = model(x)
             one_hot = torch.zeros([x.shape[0], class_num], dtype=torch.uint8).cuda()
-            label_tensor = torch.tensor(label).reshape(-1, 1).cuda()
+            label_tensor = torch.tensor(label).reshape(-1, 1).cuda().repeat(x.shape[0], 1)
             one_hot.scatter_(1, label_tensor, 1)
             one_hot = one_hot.bool()
 
@@ -55,7 +55,7 @@ class BaseAttack:
         else:
             raise NotImplementedError
 
-    def attack(self, loss, x, y, init=None, buffer=None, **kwargs):
+    def attack(self, loss_func, x, y, init=None, buffer=None, **kwargs):
         """
         :param loss: Target Black-box model loss function
         :param x: Benign image
