@@ -1,3 +1,4 @@
+import copy
 import os
 import torch
 import torch.nn as nn
@@ -6,9 +7,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 import time
 
-import utils.tools as utils
-from utils.datasets import preprocess
-# from datasets import postprocess
+from utils.tools import preprocess, save_model
 from advertorch.attacks import LinfPGDAttack
 from advertorch.context import ctx_noparamgrad_and_eval
 
@@ -36,13 +35,6 @@ class Trainer(object):
         self.checkpoints_dir = os.path.join(self.log_dir, "checkpoints")
         if not os.path.exists(self.checkpoints_dir):
             os.makedirs(self.checkpoints_dir)
-
-        # self.images_dir = os.path.join(self.log_dir, "images")
-        # if not os.path.exists(self.images_dir):
-        #     os.makedirs(self.images_dir)
-        # self.valid_samples_dir = os.path.join(self.log_dir, "valid_samples")
-        # if not os.path.exists(self.valid_samples_dir):
-        #     os.makedirs(self.valid_samples_dir)
 
         # model
         self.flow = flow
@@ -100,84 +92,41 @@ class Trainer(object):
         self.meta_test_batch = 1
         self.temp_meta_path = args.name + '.pth'
 
-        # CMA-ES
-        self.cma_options = {'CMA_active': False,
-                            'CMA_diagonal': True,
-                            'popsize': self.args.cma_popsize,
-                            'seed': self.args.cma_seed,
-                            'ftarget': self.args.cma_ftarget,
-                            'maxfevals': self.args.cma_update_max_epoch,
-                            'tolfun': 1e-10,
-                            'verb_disp': 0}
         # adversary
         self.linf = 8. / 255
         self.adversary_list = []
         self.adversary_iter_num = 10
         for i in range(len(self.adv_models)):
             self.adversary_list.append(
-            LinfPGDAttack(
-                self.adv_models[i], loss_fn=nn.CrossEntropyLoss(reduction="sum"), eps=8. / 255,
-                nb_iter=self.adversary_iter_num, eps_iter=2. / 255, rand_init=True, clip_min=0.0,
-                clip_max=1.0, targeted=False))
+                LinfPGDAttack(
+                    self.adv_models[i], loss_fn=nn.CrossEntropyLoss(reduction="sum"), eps=8. / 255,
+                    nb_iter=self.adversary_iter_num, eps_iter=2. / 255, rand_init=True, clip_min=0.0,
+                    clip_max=1.0, targeted=False))
         print('Meta Learner Initialization done.')
 
     def adv_loss(self, y, label):
-        loss = 0.
-        # selected_class = [864, 394, 776, 911, 430, 41, 265, 988, 523, 497]
-        #
-        # for idx in range(len(label)):
-        #     label[idx] = selected_class.index(int(label[idx]))
-
-        # loss = None
+        loss = 0.0
         for adv_model in self.adv_models:
-            #            loss = 0.
             logits = adv_model(y)
-            # logits = logits[:, selected_class]
 
             if not self.target:
-                # if self.openset:
-                    # label = torch.tensor([self.openset_top5_labels_list.index(int(i)) for i in label]).cuda()
-                    # logits = logits[:, self.openset_top5_labels_list]
-                # print (logits[0,:])
                 one_hot = torch.zeros_like(logits, dtype=torch.uint8)
                 label = label.reshape(-1, 1)
                 one_hot.scatter_(1, label, 1)
-                # # print ('1',~one_hot[0,:], logits[one_hot])
                 one_hot = one_hot.bool()
-                # # print ('2', ~one_hot[0,:], logits[one_hot])
                 diff = logits[one_hot] - torch.max(logits[~one_hot].view(len(logits), -1), dim=1)[0]
                 margin = torch.nn.functional.relu(diff + self.margin, True) - self.margin
-                # import torch.nn.functional as F
-                # print (logits.size(), label.size())
-                # margin = -F.cross_entropy(logits, label.view(-1), reduction='mean')
 
             else:
-                # diff = torch.max(torch.cat((logits[:, :label],logits[:,(label+1):]), dim=1), dim=1)[0] - logits[:, label]
-                # margin = torch.nn.functional.relu(diff + self.margin, True) - self.margin
-
-                # one_hot = torch.zeros_like(logits, dtype=torch.uint8)
-                # label = label.reshape(-1, 1)
-                # one_hot.scatter_(1, label, 1)
-                # one_hot = one_hot.bool()
 
                 target_one_hot = torch.zeros_like(logits, dtype=torch.uint8)
                 target_one_hot.scatter_(1, self.target_label, 1)
                 target_one_hot = target_one_hot.bool()
-                # selected = one_hot; selected[:, selected_class] = True; selected = (~one_hot & selected)
-                # diff = torch.max(logits[~one_hot].view(len(logits), -1), dim=1)[0] - logits[target_one_hot]
-
-                # diff = logits[one_hot] - logits[target_one_hot]
-                # max loss
-                # diff = torch.max(logits, dim=1)[0] - logits[target_one_hot]
                 # target loss
                 diff = -logits[target_one_hot]
-                # target log loss
-                # logits = torch.nn.functional.softmax(logits, dim=1)
-                # diff = -torch.log(logits[target_one_hot])
                 margin = torch.nn.functional.relu(diff + self.margin, True) - self.margin
 
             loss += margin.mean()
-            # loss = margin.mean() if (loss is None or loss > margin.mean()) else loss
         loss /= len(self.adv_models)
 
         return loss
@@ -192,13 +141,12 @@ class Trainer(object):
 
                 if iter_num > 0:
                     adversary = self.adversary_list[model_idx]
-                    # print ('adv_train_rand')
                     with ctx_noparamgrad_and_eval(model_chosen):
                         x = adversary.perturb(x, None)
                 else:
                     x = preprocess(x, 1.0, 0.0, self.x_bins, False)
 
-            elif (not no_adv):
+            elif not no_adv:
                 model_idx = np.random.randint(0, len(self.adv_models))
                 model_chosen = self.adv_models[model_idx]
 
@@ -233,47 +181,31 @@ class Trainer(object):
         label = label.long()
 
         processed_x = self.augmentation(x, label, epoch < self.args.adv_epoch)
-        torch.save(self.flow.state_dict(), './' + self.temp_meta_path)
+        _flow = copy.deepcopy(self.flow)
 
-        self.optim = torch.optim.Adam(self.flow.parameters(), lr=0.0004, betas=self.args.betas, weight_decay=self.args.regularizer)
+        self.optim = torch.optim.Adam(self.flow.parameters(), lr=0.0004, betas=self.args.betas,
+                                      weight_decay=self.args.regularizer)
 
         for i in range(self.meta_iteration):
-            # y, logdet = self.flow.sample(processed_x)
             y, logdet = self.flow.decode(processed_x, return_prob=True)
- 
-            # loss_prob, loss_cls = torch.mean(logdet), self.adv_loss(torch.tanh(y) * 8. / 255. + x, label)  # work
-            loss_prob, loss_cls = torch.mean(logdet), self.adv_loss(torch.clamp(torch.clamp(y, -self.linf, self.linf) + x, 0, 1), label)
-            # loss_prob, loss_cls = torch.mean(logdet), self.adv_loss(torch.clamp(y / torch.max(y) * 0.05 + x, 0, 1), label)
-            # loss_prob, loss_cls = torch.mean(logdet), self.adv_loss(y / torch.max(y).abs().max(-1)[0].max(-1)[0].max(-1)[0].view(-1, 1, 1, 1) * 0.05 + x, label)
-            # loss_prob, loss_cls = torch.mean(logdet), self.adv_loss(torch.clamp(torch.sign(y) * 8. / 255 + x, 0, 1), label)
-            # loss = self.args.Lambda * loss_prob + loss_cls
-            loss = loss_cls # + 0.01 * loss_prob
-            # backward
-            # self.graph.zero_grad()
+
+            loss_prob, loss_cls = torch.mean(logdet), self.adv_loss(
+                torch.clamp(torch.clamp(y, -self.linf, self.linf) + x, 0, 1), label)
+            loss = loss_cls
             self.optim.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.flow.parameters(), self.max_grad_norm)
             # step
             self.optim.step()
-            # print("Iteration: {} \t Loss:{:.5f} \t Loss_Prob:{:.5f} \t Loss_Cls:{:.5f}".format(
-            #         self.global_step, loss.data, loss_prob.data, loss_cls.data))
 
         # meta_outer_update
         lr = self.schedule(loss_prob.data, loss_cls.data, epoch)
         dic = self.flow.state_dict()
         keys = list(dic.keys())
 
-        meta_state = torch.load('./' + self.temp_meta_path)
-        # dic_copy = flow_copy.state_dict()
+        meta_state = _flow.state_dict()
         for key in keys:
-            # print(torch.sum(tmp_state[key] - dic[key]))
-            # if torch.mean(tmp_state[key] - dic[key]) != 0:
-            #     print('!')
-            # 0.02 / 8 * 2 / 5 = 0.001
-            # 0.004 / 8 * 2 / 5 = 0.0002
             dic[key] = meta_state[key] + lr / batch_length * 2 / self.meta_iteration * (dic[key] - meta_state[key])
-        #
-        # assert False
         return loss_prob.data, loss_cls.data
 
     def meta_test(self):
@@ -282,6 +214,7 @@ class Trainer(object):
             pred_lable = torch.argmax(prob_output, dim=1)
             print(pred_lable.item(), label)
             return pred_lable.item() != label
+
         mean_loss_prob, mean_loss_cls = 0, 0
         with torch.no_grad():
             for batch_data in self.validset_loader:
@@ -292,7 +225,8 @@ class Trainer(object):
                     labels = labels.cuda()
                 labels = labels.long()
                 y, logdet = self.flow.decode(images, return_prob=True)
-                loss_prob, loss_cls = torch.mean(logdet), self.adv_loss(torch.clamp(torch.sign(y) * 8. / 255 + images, 0, 1), labels)
+                loss_prob, loss_cls = torch.mean(logdet), self.adv_loss(
+                    torch.clamp(torch.sign(y) * 8. / 255 + images, 0, 1), labels)
                 mean_loss_prob += loss_prob
                 mean_loss_cls += loss_cls
         with open(os.path.join(self.log_dir, "meta_test_loss.txt"), "a") as f:
@@ -321,7 +255,7 @@ class Trainer(object):
                     self.meta_test()
                 # save model
                 if (self.global_step + 1) % self.save_gap == 0:
-                    utils.save_model(self.flow, self.optim, self.checkpoints_dir, self.global_step + 1)
+                    save_model(self.flow, self.optim, self.checkpoints_dir, self.global_step + 1)
                 self.global_step = self.global_step + 1
                 # TODO change the print
                 currenttime = time.time()
@@ -337,6 +271,6 @@ class Trainer(object):
                     with open(os.path.join(self.log_dir, "Epoch_NLL.txt"), "a") as f:
                         currenttime = time.time()
                         elapsed = currenttime - starttime
-                        f.write("epoch: {} \t iteration: {}/{} \t elapsed time: {:.2f}\t mean loss prob: {:.5f}\t mean loss cls: {:.5f}".format(epoch, self.global_step, total_its, elapsed, mean_loss_prob, mean_loss_cls) + "\n")
-
-
+                        f.write(
+                            "epoch: {} \t iteration: {}/{} \t elapsed time: {:.2f}\t mean loss prob: {:.5f}\t mean loss cls: {:.5f}".format(
+                                epoch, self.global_step, total_its, elapsed, mean_loss_prob, mean_loss_cls) + "\n")

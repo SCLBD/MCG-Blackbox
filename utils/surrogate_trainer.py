@@ -47,6 +47,7 @@ class TrainModelSurrogate:
             forward_loss = torch.nn.MSELoss()(s_score, target_score.detach()) * self.forward_loss_lamda
             lamda = self.lamda if _i == 0 else 1
             loss = forward_loss * lamda
+            loss *= 0.01
             loss.backward()
 
         torch.nn.utils.clip_grad_norm_(surrogate_model.parameters(), self.max_grad_clip)
@@ -70,7 +71,6 @@ class TrainModelSurrogate:
         target_score = target_logits.gather(1, labels.reshape(-1, 1))
         # target_score = target_prob.topk(2, dim=1)[0]
         forward_loss = torch.nn.MSELoss()(s_score, target_score.detach()) * self.forward_loss_lamda
-
         surrogate_model.zero_grad()
         forward_loss.backward()
         torch.nn.utils.clip_grad_norm_(surrogate_model.parameters(), self.max_grad_clip)

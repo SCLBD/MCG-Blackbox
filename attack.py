@@ -1,5 +1,6 @@
 import argparse
 import ast
+import copy
 import sys
 import torch
 
@@ -13,6 +14,7 @@ def attack():
     attack_init.seed_init()
     dataloader = attack_init.data_init(args)
     T, G, surrogates, surrogate_optims, F = attack_init.model_init(args)
+    _G = copy.deepcopy(G)
     attacker = attack_init.attacker_init(args)
     image_buffer, clean_buffer, adv_buffer = attack_init.buffer_init(args)
     trainer = attack_init.trainer_init(args)
@@ -84,7 +86,7 @@ def attack():
             latent, _ = finetune_latent(G, surrogates, images, labels, latent, args)
 
         if args.finetune_glow:
-            meta_finetune(G, surrogates, images, labels, latent, args, meta_iteration=3)
+            meta_finetune(G, surrogates, images, labels, latent, args, meta_iteration=2)
 
         # First attack attempt
         perturbation = generate_function(images, latent)
@@ -116,6 +118,9 @@ def attack():
         with open(log_path, 'a') as f:
             f.write(log)
 
+        if args.finetune_reload:
+            G = copy.deepcopy(_G)
+
     final_log = f'Final Log with attack finished:\n' \
                 f'Valid image number: {F.count_total}\n' \
                 f'Target model: {args.target_model_name} Surrogate models: {args.surrogate_model_names}\n' \
@@ -142,29 +147,25 @@ if __name__ == '__main__':
     # input output path
     parser.add_argument("-d", "--dataset_name", type=str)
     parser.add_argument("-r", "--dataset_root", type=str)
-    parser.add_argument("--flow_model_path", type=str, default="")
+    parser.add_argument("--generator_path", type=str, default="")
     parser.add_argument("--target_model_name", type=str)
     parser.add_argument("--surrogate_model_names", type=str)
     parser.add_argument("--buffer_limit", type=int, default=1)
-    parser.add_argument("--attack_method", type=str, help='cma-es, square')
-    parser.add_argument("--defence_method", type=str, help='cma-es, square', default=None)
+    parser.add_argument("--attack_method", type=str, help='square, signhunter, cgattack')
+    parser.add_argument("--defence_method", type=str, help='snd, jpeg', default=None)
 
-    parser.add_argument("--before_transfer", action="store_true")
     parser.add_argument("--finetune_clean", action="store_true")
     parser.add_argument("--finetune_perturbation", action="store_true")
-    parser.add_argument("--finetune_query", action="store_true")
     parser.add_argument("--finetune_glow", action="store_true")
-    parser.add_argument("--finetune_glow_load", action="store_true")
-    parser.add_argument("--finetune_coefficient", action="store_true")
+    parser.add_argument("--finetune_reload", action="store_true")
     parser.add_argument("--finetune_latent", action="store_true")
-    parser.add_argument("--load_surrogate_models", action="store_true")
     parser.add_argument("--test_fasr", action="store_true")
     parser.add_argument("--finetune_mini_batch_size", type=int, default=20)
 
     parser.add_argument("--max_query", type=int, default=10000)
     parser.add_argument("--class_num", type=int, default=1000)
     parser.add_argument("--linf", type=float, default=0.05)
-    parser.add_argument("--target_label", type=int, default=None)
+    parser.add_argument("--target_label", type=int, default=1)
 
     # log root
     parser.add_argument("--log_root", type=str, default=None)

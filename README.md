@@ -6,7 +6,7 @@
 <a href="#top">[Back to top]</a>
 -->
 
-<img src="docs/pipeline.pdf" width="800px"/> 
+<img src="docs/pipeline.jpg" width="800px"/> 
 
 #### Abstract
 
@@ -23,39 +23,90 @@ transferability to train the meta generator on a white-box surrogate model, then
 the target model. The proposed framework with the two types of adversarial transferability can be naturally combined 
 with any off-the-shelf query-based attack methods to boost their performance.
 
-#### Requirements
+#### Environment
 
+```
+advertorch==0.2.3
+argparse==1.4.0
+astunparse==1.6.3
+pytorch==1.3.0
+torchattacks==3.0.0
+torchvision==0.4.1
+```
 
+#### Pre-trained Models
+
+Please download our [pre-trained model](1) and put it in `./checkpoints` for quick inference.
+
+| Model | Description
+| :--- | :----------
+|checkpoints/cifar10_mcg.pth.tar | Pre-trained CIFAR-10 MCG Generator.
+|checkpoints/imagenet_mcg.pth.tar | Pre-trained ImageNet MCG Generator.
 
 #### Attack
 
+We provide two demo scripts of running untargeted attack on CIFAR-10 and ImageNet dataset.
+
+```
+bash scripts/cifar10_attack_untargeted.sh
+bash scripts/imagenet_attack_untargeted.sh
+```
+
+Please specify the root of your local dataset with `--dataset_root`.
+You can modify `--target_model_name` to change the target model.
+And modify `--attack_method` to change the combined downstream black-box attack methods.
+We provide several methods including `square`, `signhunter` and `cgattack`. 
+You can combine MCG with your custom black-box attacking methods.
+Note that the MCG generator on imagenet are pre-trained on random 10 classes data,
+when transferring to different classes of your local data, the performance will fluctuate.
+
+Different fine-tuning options can be tuned to adapt your custom data for improving performance.
+Please see the `--finetune` args in `--attack.py` for more details. 
+
 #### Train
+
++ Data Pre-Processing
+
+Training includes two stages. For first stage, we pre-train our MCG, i.e. c-Glow model
+with regular flow-based generator training modes (nll loss). 
+To construct dataset with pseudo labels to guide the model training.
+We first use other transfer-based attack methods to create adversarial examples.
+Please check `./data/data_prehandle.py` for details. 
+You can modify the surrogate attacking methods and local data with custom settings. 
+The data will be stored in `.npy` format.
+
++ Training
+
+After you pre-processing your data, you can begin to train.
+For first stage, please run the following script.
+
+```
+bash scripts/imagenet_pretrain.sh
+```
+
+You need to set `--train_dataset_root` and `--valid_dataset_root` to specify the data root.
+Set `--logroot` to specify the log\&checkpoint root.
+After finishing the first stage training, please run the following script for meta-training.  
+
+```
+bash scripts/imagenet_metatrain.sh
+```
+
+During meta-training, we only encourage the generator to generate perturbations with more aggressive 
+with adversarial loss, which only need the benign images.
+You need to set `--model_path` for specifying the checkpoint path of the first stage training.
 
 #### Citation
 
-If interested, you can read our recent works about backdoor learning, and more works about trustworthy AI can be found [here](https://sites.google.com/site/baoyuanwu2015/home).
+If you find this work useful for your research, please cite:
 
 ```
-@article{wu2022backdoorbench,
-  title={BackdoorBench: A Comprehensive Benchmark of Backdoor Learning},
-  author={Wu, Baoyuan and Chen, Hongrui and Zhang, Mingda and Zhu, Zihao and Wei, Shaokui and Yuan, Danni and Shen, Chao and Zha, Hongyuan},
-  journal={arXiv preprint arXiv:2206.12654},
-  year={2022}
-}
-
-@inproceedings{dbd-backdoor-defense-iclr2022,
-title={Backdoor Defense via Decoupling the Training Process},
-author={Huang, Kunzhe and Li, Yiming and Wu, Baoyuan and Qin, Zhan and Ren, Kui},
-booktitle={International Conference on Learning Representations},
-year={2022}
-}
-
-@inproceedings{ssba-backdoor-attack-iccv2021,
-title={Invisible backdoor attack with sample-specific triggers},
-author={Li, Yuezun and Li, Yiming and Wu, Baoyuan and Li, Longkang and He, Ran and Lyu, Siwei},
-booktitle={Proceedings of the IEEE/CVF International Conference on Computer Vision},
-pages={16463--16472},
-year={2021}
+@article{yin2021mcg,
+  title={Generalizable Black-box Adversarial Attack with Meta Learning},
+  author={Yin, Fei and Zhang, Yong and Wu, Baoyuan and Feng, Yan and Zhang, Jingyi and Fan, Yanbo and Yang, Yujiu},
+  journal={IEEE transactions on pattern analysis and machine intelligence},
+  year={2021},
+  publisher={IEEE}
 }
 ```
 

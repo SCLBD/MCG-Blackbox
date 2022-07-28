@@ -1,6 +1,5 @@
 import torch
 import copy
-from graphviz import Digraph
 import torch
 from models.flow_latent import latent_operate
 
@@ -20,6 +19,7 @@ def iter_graph(root, callback):
 
 
 def register_hooks(var):
+    from graphviz import Digraph
     fn_dict = {}
 
     def hook_cb(fn):
@@ -91,7 +91,7 @@ def adv_loss(adv_models, y, label, targeted, class_num):
     return loss
 
 
-def meta_finetune(generator, adv_models, images, labels, latent, args, meta_iteration=3):
+def meta_finetune(generator, adv_models, images, labels, latent, args, meta_iteration=1):
     # Meta finetune generator (c-generator) to adapt to the current task
     # Note here finetune need gradients from the surrogate models
     generator.train()
@@ -99,6 +99,8 @@ def meta_finetune(generator, adv_models, images, labels, latent, args, meta_iter
     meta_state = copy.deepcopy(generator.state_dict())
     assert latent is not None
     latent, latent_vec = latent_operate(latent, None, reverse=True)
+    latent = latent.clone().detach()
+    latent_vec = [lat.clone().detach() for lat in latent_vec]
     for i in range(meta_iteration):
         # Meta inner update
         # latent, latent_vec = latent_operate(latent, reverse=True)
@@ -117,9 +119,11 @@ def meta_finetune(generator, adv_models, images, labels, latent, args, meta_iter
         optimizer.step()
 
     # Meta outer update
-    lr = 0.005
+    lr = 0.2  # 0.005
     dic = generator.state_dict()
     for key in list(dic.keys()):
+        if 'norm' in key:
+            continue
         dic[key] = meta_state[key] + lr * (dic[key] - meta_state[key])
     generator.eval()
     return

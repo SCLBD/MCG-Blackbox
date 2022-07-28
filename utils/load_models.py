@@ -19,9 +19,9 @@ except Exception:
 
 
 def load_generator(args):
-    print(f'C-Glow path: {args.flow_model_path}')
+    print(f'C-Glow path: {args.generator_path}')
     G = CondGlowModel(args)
-    ckpt = torch.load(args.flow_model_path, map_location='cpu')['model']
+    ckpt = torch.load(args.generator_path, map_location='cpu')['model']
     G.load_state_dict(ckpt)
     G = G.cuda()
     G.eval()
@@ -164,7 +164,7 @@ def load_cifar_model(model_name, home_path='checkpoints/cifar10_target_models/',
     model = model.cuda()
     model.eval()
     if require_optim:
-        optimizer = torch.optim.Adam(pretrained_model.parameters(), lr=3e-4)
+        optimizer = torch.optim.Adam(pretrained_model.parameters(), lr=1e-4)
         return model, optimizer
     return model
 
