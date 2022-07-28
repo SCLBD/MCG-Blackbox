@@ -98,16 +98,16 @@ def meta_finetune(generator, adv_models, images, labels, latent, args, meta_iter
     optimizer = torch.optim.Adam(generator.parameters(), lr=0.001, betas=(0.9, 0.9999), weight_decay=0.0)
     meta_state = copy.deepcopy(generator.state_dict())
     assert latent is not None
-
+    latent, latent_vec = latent_operate(latent, None, reverse=True)
     for i in range(meta_iteration):
         # Meta inner update
-        latent, latent_vec = latent_operate(latent, reverse=True)
+        # latent, latent_vec = latent_operate(latent, reverse=True)
         perturbation, logdet = generator.flow.decode(images, latent, zs=latent_vec)
         perturbation = torch.clamp(perturbation, min=-args.linf, max=args.linf)
 
         loss_prob = torch.mean(logdet)
         loss_adv = adv_loss(adv_models, torch.clamp(images + perturbation, 0, 1), labels,
-                            targeted=args.targeted, class_num=args.num_classes)
+                            targeted=args.targeted, class_num=args.class_num)
         loss = loss_adv
 
         optimizer.zero_grad()
@@ -127,23 +127,27 @@ def meta_finetune(generator, adv_models, images, labels, latent, args, meta_iter
 
 def finetune_latent(generator, adv_models, images, labels, latent, args, iteration=10, lr=0.01):
     generator.eval()
-
     latent, latent_vec = latent_operate(latent, reverse=True)
-    latent = latent.clone().detach().float().cuda()
-    latent.requires_grad_()
-    optimizer = torch.optim.Adam([latent], lr=lr, betas=(0.9, 0.9999), weight_decay=0.0)
+    # latent = torch.tensor(latent, dtype=torch.float32, device='cuda', requires_grad=True)
+    latent = latent.clone().detach().requires_grad_(True)
+    optimizer = torch.optim.Adam([latent], lr=lr, betas=(0.9, 0.5), weight_decay=0.0)
 
     for i in range(iteration):
+        if i > 0:
+            latent_vec = [v.clone().detach().requires_grad_(True) for v in latent_vec]
+            images = images.clone().detach()
+
         perturbation, _ = generator.flow.decode(images, latent, zs=latent_vec)
         perturbation = torch.clamp(perturbation, min=-args.linf, max=args.linf)
         loss = adv_loss(adv_models, torch.clamp(images + perturbation, 0, 1), labels,
-                            targeted=args.targeted, class_num=args.num_classes)
+                        targeted=args.targeted, class_num=args.class_num)
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         latent.grad.zero_()
-
+        # for v in latent_vec:
+        #     v.grad.zero_()
         if loss < -1:
             break
 

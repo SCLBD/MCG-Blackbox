@@ -5,7 +5,9 @@ python attack.py \
     --dataset_name=imagenet --dataset_root='/home/yf/adversarial/MetaAttack/imagenet/cgattack/data/meta_imagenet' \
     --flow_model_path='/home/yf/adversarial/MetaAttack/imagenet/cgattack/save/imagenet/imagenet_train_reverse_mi_18000_clamp_loss/checkpoints/checkpoint_2400.pth.tar' \
     --surrogate_model_names=resnet50 \
-    --attack_method=square  --finetune_clean --finetune_perturbation --finetune_glow  --buffer_limit=1 --max_query=1000
+    --attack_method=square  --finetune_clean --finetune_latent --finetune_glow --finetune_perturbation --buffer_limit=1 --max_query=1000 --class_num=1000 --linf=0.05
+#
+#
 #--finetune_latent
 #--finetune_latent --test_fasr
 

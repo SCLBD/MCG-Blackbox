@@ -79,9 +79,9 @@ def attack():
         if args.finetune_perturbation:
             adv_buffer.add_clean(images, clean_logits, labels)
 
-        latent, __latent_vec = latent_initialize(images, G, latent_operate)
+        latent, _ = latent_initialize(images, G, latent_operate)
         if args.finetune_latent:
-            latent, __latent_vec = finetune_latent(G, surrogates, images, labels, latent, args)
+            latent, _ = finetune_latent(G, surrogates, images, labels, latent, args)
 
         if args.finetune_glow:
             meta_finetune(G, surrogates, images, labels, latent, args, meta_iteration=3)
@@ -93,7 +93,6 @@ def attack():
         query_cnt += 1
         if loss_output['margin'] <= 0:
             success = True
-        print(loss_output['margin'], loss_output['loss'])
 
         if not args.test_fasr and not success:
             if args.attack_method in ['cgattack']:
@@ -163,6 +162,8 @@ if __name__ == '__main__':
     parser.add_argument("--finetune_mini_batch_size", type=int, default=20)
 
     parser.add_argument("--max_query", type=int, default=10000)
+    parser.add_argument("--class_num", type=int, default=1000)
+    parser.add_argument("--linf", type=float, default=0.05)
     parser.add_argument("--target_label", type=int, default=None)
 
     # log root
@@ -213,7 +214,6 @@ if __name__ == '__main__':
     parser.add_argument("--rand", type=ast.literal_eval, default=False)
 
     parser.add_argument("--clamp", type=ast.literal_eval, default=False)
-    parser.add_argument("--num_classes", type=int, default=0)
     parser.add_argument("--class_size", type=int, default=-1)
     parser.add_argument("--label", type=int, default=0)
 
