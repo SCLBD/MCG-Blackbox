@@ -1,6 +1,6 @@
 #!/bin/bash
-train_dataset_root='/home/yf/adversarial/MetaAttack/imagenet/cgattack/curriculum/curriculum_train_imagenet_sgm_Resnet50_0.55_1.npy'
-valid_dataset_root='/home/yf/adversarial/MetaAttack/imagenet/cgattack/data/meta_imagenet'
+train_dataset_root=''
+valid_dataset_root=''
 dataset_name='imagenet'
 logroot='./save/imagenet/'
 epochs=5
@@ -8,7 +8,7 @@ batchsize=16
 lr=0.001
 adv_loss=True
 name='imagenet_metatrain'
-model_path='save/imagenet/imagenet_train_forward_di/checkpoints/checkpoint_18000.pth.tar'
+model_path=''
 
 support_set='Resnet50'
 query_set='Resnet18'

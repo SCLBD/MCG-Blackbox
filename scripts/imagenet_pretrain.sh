@@ -25,8 +25,8 @@ support_set='Resnet50'
 query_set='Resnet18'
 margin=5.0
 logroot="./save/imagenet/"
-train_dataset_root="/home/yf/adversarial/MetaAttack/imagenet/cgattack/curriculum/curriculum_train_imagenet_di_Resnet50_0.55_1.npy"
-valid_dataset_root="/home/yf/adversarial/MetaAttack/imagenet/cgattack/data/meta_imagenet"
+train_dataset_root=""
+valid_dataset_root=""
 
 CUDA_VISIBLE_DEVICES=0 \
 python train.py --dataset_name=imagenet \
