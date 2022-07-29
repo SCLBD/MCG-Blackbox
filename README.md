@@ -36,7 +36,7 @@ torchvision==0.4.1
 
 #### Pre-trained Models
 
-Please download our [pre-trained model](1) and put it in `./checkpoints` for quick inference.
+Please download our [pre-trained model](https://drive.google.com/drive/folders/1--9p_jdAFnlo49_ZYfuGxxShChemqi_F?usp=sharing) and put it in `./checkpoints` for quick inference.
 
 | Model | Description
 | :--- | :----------
@@ -94,7 +94,7 @@ bash scripts/imagenet_metatrain.sh
 
 During meta-training, we only encourage the generator to generate perturbations with more aggressive 
 with adversarial loss, which only need the benign images.
-You need to set `--model_path` for specifying the checkpoint path of the first stage training.
+You need to set `--model_path` for specifying the checkpoint path of the first stage training results.
 
 #### Citation
 
