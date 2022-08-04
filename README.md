@@ -105,7 +105,7 @@ If you find this work useful for your research, please cite:
   title={Generalizable Black-box Adversarial Attack with Meta Learning},
   author={Yin, Fei and Zhang, Yong and Wu, Baoyuan and Feng, Yan and Zhang, Jingyi and Fan, Yanbo and Yang, Yujiu},
   journal={IEEE transactions on pattern analysis and machine intelligence},
-  year={2021},
+  year={2022},
   publisher={IEEE}
 }
 ```
