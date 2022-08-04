@@ -101,7 +101,7 @@ You need to set `--model_path` for specifying the checkpoint path of the first s
 If you find this work useful for your research, please cite:
 
 ```
-@article{yin2021mcg,
+@article{yin2022mcg,
   title={Generalizable Black-box Adversarial Attack with Meta Learning},
   author={Yin, Fei and Zhang, Yong and Wu, Baoyuan and Feng, Yan and Zhang, Jingyi and Fan, Yanbo and Yang, Yujiu},
   journal={IEEE transactions on pattern analysis and machine intelligence},
