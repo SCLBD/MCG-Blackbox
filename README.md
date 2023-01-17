@@ -36,7 +36,7 @@ torchvision==0.4.1
 
 #### Pre-trained Models
 
-Please download our [pre-trained model](https://drive.google.com/drive/folders/1--9p_jdAFnlo49_ZYfuGxxShChemqi_F?usp=sharing) and put it in `./checkpoints` for quick inference.
+Please download our [pre-trained model](https://drive.google.com/drive/folders/18m4KY-J3kpAcXGgmMmGroFz08DGxA2FU?usp=sharing) and put it in `./checkpoints` for quick inference.
 
 | Model | Description
 | :--- | :----------
